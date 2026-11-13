@@ -1,0 +1,6 @@
+id=coloros_telemetry_blocker
+name=ColorOS Telemetry Blocker
+version=v2.3
+versionCode=23
+author=Kosakanao
+description=Blocks ColorOS/OPPO ads, telemetry and app-usage profiling via hosts. Mounted by the KernelSU metamodule (Hybrid Mount). Edit the list from the module's own web editor — no CLI needed.

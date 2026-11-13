@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ColorOS Telemetry Blocker</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#181b21; --line:#262a32; --fg:#e8eaed;
+    --muted:#9aa0a6; --accent:#7bd88f; --warn:#f5a524; --err:#f06a6a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
+    display:flex;flex-direction:column;
+    padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+    gap:10px;
+  }
+  header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.2px}
+  .sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .pill{
+    font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);
+    color:var(--muted);background:var(--card);white-space:nowrap;
+  }
+  .pill.ok{color:var(--accent);border-color:#2c4a35;background:#131a16}
+  .pill.bad{color:var(--err);border-color:#4a2c2c;background:#1a1313}
+  #editor{
+    flex:1;min-height:180px;width:100%;resize:none;
+    background:var(--card);color:var(--fg);
+    border:1px solid var(--line);border-radius:12px;
+    padding:12px;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    outline:none;tab-size:2;white-space:pre;overflow:auto;
+  }
+  #editor:focus{border-color:#3a4453}
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+  .stat{font-size:11.5px;color:var(--muted);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  button{
+    font:inherit;font-size:13px;padding:9px 16px;border-radius:10px;
+    border:1px solid var(--line);background:var(--card);color:var(--fg);
+  }
+  button:active{transform:scale(.98)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#0b1410;font-weight:600}
+  button:disabled{opacity:.5}
+  #msg{font-size:11.5px;min-height:16px;color:var(--muted)}
+  #msg.ok{color:var(--accent)} #msg.err{color:var(--err)}
+  .hint{font-size:11px;color:var(--muted);line-height:1.6}
+  .hint b{color:var(--warn);font-weight:600}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ColorOS Telemetry Blocker</h1>
+    <div class="sub">Hybrid Mount 挂载 · 直接编辑 hosts</div>
+  </div>
+  <span class="pill" id="mountPill">挂载检测中…</span>
+</header>
+
+<textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="读取中…"></textarea>
+
+<div class="bar">
+  <span class="stat" id="stat">—</span>
+  <button id="btnReload">重新读取</button>
+  <button class="primary" id="btnSave">保存</button>
+</div>
+
+<div id="msg"></div>
+
+<div class="hint">
+  写入采用 <b>cat &gt; 原地覆盖</b>，保留 inode，保存后立即生效，无需重启。
+  行首 <code>#</code> 为注释；格式 <code>0.0.0.0 域名</code>。
+</div>
+
+<script>
+const MOD  = "/data/adb/modules/coloros_telemetry_blocker";
+const HOSTS = MOD + "/system/etc/hosts";
+const STATE = "/data/adb/hybrid-mount/run/state.json";
+
+const $ = (id) => document.getElementById(id);
+const editor = $("editor"), stat = $("stat"), msg = $("msg"), pill = $("mountPill");
+
+function say(text, kind) {
+  msg.textContent = text || "";
+  msg.className = kind || "";
+}
+
+/** 结果归一化：KernelSU 系返回 stdout 字符串；个别分支返回 {errno,stdout,stderr} */
+function norm(r) {
+  if (typeof r === "string") {
+    const s = r.trim();
+    if (s && (s[0] === "{" || s[0] === "[")) {
+      let o = null;
+      try { o = JSON.parse(s); } catch (e) { o = null; }
+      if (o && typeof o === "object" && ("errno" in o || "code" in o || "stdout" in o)) {
+        const code = (o.errno !== undefined) ? o.errno : (o.code !== undefined ? o.code : 0);
+        if (code !== 0) throw new Error(((o.stderr || "") + (o.stdout || "")).trim() || ("退出码 " + code));
+        return o.stdout || "";
+      }
+    }
+    return r;
+  }
+  if (r && typeof r === "object") {
+    const code = (r.errno !== undefined) ? r.errno : (r.code !== undefined ? r.code : 0);
+    if (code !== 0) throw new Error(((r.stderr || "") + (r.stdout || "")).trim() || ("退出码 " + code));
+    return r.stdout || "";
+  }
+  return String(r == null ? "" : r);
+}
+
+/**
+ * 管理器 WebUI 桥。
+ * 实测 BakaSU/KernelSU Next：ksu.exec(cmd) 只接受一个参数，同步返回 stdout 字符串。
+ * 传第二个 options 对象会让整个调用返回 undefined，所以这里只传 cmd。
+ */
+function sh(cmd) {
+  const k = window.ksu || window.kernelsu;
+  if (!k || typeof k.exec !== "function") {
+    return Promise.reject(new Error("当前管理器没有提供 WebUI 执行接口"));
+  }
+  let r;
+  try {
+    r = k.exec(cmd);
+  } catch (e) {
+    return Promise.reject(new Error(String((e && e.message) || e)));
+  }
+  if (r && typeof r.then === "function") return Promise.resolve(r).then(norm);
+  try {
+    return Promise.resolve(norm(r));
+  } catch (e) {
+    return Promise.reject(e);
+  }
+}
+
+function toBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function stats(text) {
+  const lines = text.split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  let blocked = 0, commented = 0;
+  for (const l of lines) {
+    if (/^0\.0\.0\.0\s+\S/.test(l)) blocked++;
+    else if (/^#\s*0\.0\.0\.0\s+\S/.test(l)) commented++;
+  }
+  return { lines: lines.length, blocked, commented };
+}
+
+function refreshStat(text) {
+  const s = stats(text);
+  stat.textContent = `${s.lines} 行 · 生效 ${s.blocked}` + (s.commented ? ` · 注释 ${s.commented}` : "");
+}
+
+async function checkMount() {
+  try {
+    const out = await sh(`grep -c coloros_telemetry_blocker ${STATE} 2>/dev/null || true`);
+    const hit = parseInt((out || "0").trim(), 10) > 0;
+    pill.textContent = hit ? "Hybrid Mount ✓" : "待重启挂载";
+    pill.className = "pill " + (hit ? "ok" : "");
+  } catch (e) {
+    pill.textContent = "挂载状态未知";
+    pill.className = "pill";
+  }
+}
+
+async function load() {
+  say("读取中…");
+  try {
+    const text = await sh(`cat ${HOSTS}`);
+    editor.value = text.replace(/\r\n/g, "\n");
+    refreshStat(editor.value);
+    say("");
+  } catch (e) {
+    say("读取失败：" + e.message, "err");
+  }
+  checkMount();
+}
+
+async function save() {
+  let text = editor.value.replace(/\r\n/g, "\n");
+  if (!text.endsWith("\n")) text += "\n";
+  editor.value = text;
+  const b64 = toBase64(text);
+  const cmd = [
+    "T=/data/local/tmp/.ctb_web.$$",
+    `echo '${b64}' | base64 -d > $T`,
+    `cat $T > ${HOSTS}`,                 // 原地覆盖，保留 inode
+    `chown 0:0 ${HOSTS} && chmod 644 ${HOSTS}`,
+    `chcon u:object_r:system_file:s0 ${HOSTS}`,
+    "rm -f $T",
+    "echo __SAVED__"
+  ].join(" && ");
+
+  const btn = $("btnSave");
+  btn.disabled = true;
+  say("保存中…");
+  try {
+    const out = await sh(cmd);
+    if (!String(out).includes("__SAVED__")) throw new Error("写入未确认");
+    const back = await sh(`cat ${HOSTS}`);
+    if (back.replace(/\n+$/, "") !== text.replace(/\n+$/, "")) throw new Error("回读与编辑内容不一致");
+    refreshStat(text);
+    say("已保存，立即生效", "ok");
+    if (window.ksu && typeof window.ksu.toast === "function") window.ksu.toast("已保存");
+  } catch (e) {
+    say("保存失败：" + e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+editor.addEventListener("input", () => refreshStat(editor.value));
+$("btnReload").addEventListener("click", load);
+$("btnSave").addEventListener("click", save);
+
+load();
+</script>
+</body>
+</html>

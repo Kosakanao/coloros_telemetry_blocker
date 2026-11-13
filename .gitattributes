@@ -1,0 +1,14 @@
+# 仓库内文本统一 LF：customize.sh 带 CRLF 会在手机上跑不起来
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.py      text eol=lf
+*.md      text eol=lf
+*.prop    text eol=lf
+*.html    text eol=lf
+*.yml     text eol=lf
+*.gitattributes text eol=lf
+LICENSE   text eol=lf
+
+*.png     binary
+*.zip     binary
