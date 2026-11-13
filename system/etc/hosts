@@ -1,0 +1,89 @@
+# coloros_telemetry_blocker — ColorOS / OPPO 遥测屏蔽清单
+# 模块: /data/adb/modules/coloros_telemetry_blocker
+# 该文件由 KernelSU metamodule (Hybrid Mount / magic mount) 覆盖到 /system/etc/hosts，
+# 绑的是本文件的 inode：用 `cat >` 原地写入即时生效，用 sed -i / cp 会换 inode 导致挂载失效。
+# 编辑: su -c vi /data/adb/modules/coloros_telemetry_blocker/system/etc/hosts  或  ctb add/del/off/on
+# 格式: 0.0.0.0 域名        （# 开头为注释，不生效）
+127.0.0.1 localhost
+
+# ============ A. 广告与推荐 ============
+0.0.0.0 adx.ads.heytapmobi.com
+0.0.0.0 stg-data.ads.heytapmobi.com
+0.0.0.0 stg-data-f.ads.heytapmobi.com
+0.0.0.0 stg-data-id.ads.heytapmobi.com
+0.0.0.0 stg-data-in.ads.heytapmobi.com
+0.0.0.0 stg-data-sg.ads.heytapmobi.com
+0.0.0.0 adx.ads.oppomobile.com
+0.0.0.0 adsfs.oppomobile.com
+0.0.0.0 adsfs.heytapimage.com
+0.0.0.0 adsfs-sdkconfig.heytapimage.com
+0.0.0.0 activity-cpc.heytapimage.com
+0.0.0.0 activity-cdo.heytapimage.com
+0.0.0.0 activity-landing-pag.heytap.com
+0.0.0.0 adiu.amap.com
+0.0.0.0 push-ads-cn.heytapmobi.com
+0.0.0.0 sms.ads.heytapmobi.com
+0.0.0.0 api.cdo.oppomobile.com
+0.0.0.0 gslb-cn.cdo.heytapmobi.com
+
+# ============ B. 遥测 / 上报 / 日志 ============
+0.0.0.0 rest-cn-feedback.heytapmobi.com
+0.0.0.0 static-cn-feedback.heytapmobi.com
+0.0.0.0 mdp-usertrace-cn.heytapmobi.com
+0.0.0.0 cort-report-cn.heytapmobi.com
+0.0.0.0 xlog-service.wanyol.com
+0.0.0.0 uc-track-gl.heytapmobi.com
+0.0.0.0 ums-telemetry-cn.heytapmobi.com
+0.0.0.0 api-audit.heytapmobi.com
+0.0.0.0 apisnd.heytapmobi.com
+0.0.0.0 obus-cn.dc.heytapmobi.com
+0.0.0.0 obus-conf-cn.heytapmobi.com
+0.0.0.0 obus-config-cn.heytapmobi.com
+0.0.0.0 obus-dctech-cn.heytapmobi.com
+0.0.0.0 obus-jssdk-cn.heytapmobi.com
+0.0.0.0 obus-jssdk2-cn.heytapmobi.com
+0.0.0.0 mdp-upgrade-cn.heytapmobi.com
+0.0.0.0 httpdns.ocloud.oppomobile.com
+0.0.0.0 disaster.coloros.com
+0.0.0.0 asdt.coloros.com
+0.0.0.0 asdt-server5-cn.wanyol.com
+0.0.0.0 asdt-server5-cn.allawntech.com
+0.0.0.0 ilighthouse.apps.coloros.com
+0.0.0.0 ua.prof.oppo.com
+
+# ============ C. 安全云查 / 质量上报 ============
+0.0.0.0 app-sec-cn.heytapmobi.com
+0.0.0.0 virusinfo-sec.heytapmobi.com
+0.0.0.0 omes-sec-stdsrp-cn.heytapmobi.com
+0.0.0.0 cvcloud.wanyol.com
+0.0.0.0 qualitycloud-service-cn.allawntech.com
+
+# ============ D. 应用画像 / 使用统计 / 智能服务 ============
+# 证据: com.oplus.metis dex 里的 com/oplus/apprecommend/recall/appUsageManager/*
+#       (HabitCounter / ActiveAppInfo / appLaunchRecordCollector / appSwitchStatistics)
+0.0.0.0 usop-api-cn.heytapmobi.com
+0.0.0.0 static-usop-cn.heytapimage.com
+0.0.0.0 pantanal-intelli-cn.allawntech.com
+0.0.0.0 intelligent-platform-cn.allawntech.com
+0.0.0.0 intelligent-perception-cn-test.wanyol.com
+0.0.0.0 sense-intent-cn-01.heytapmobi.com
+0.0.0.0 bot-brain-cn.heytapmobi.com
+0.0.0.0 nebula-api-cn.heytapmobi.com
+0.0.0.0 app-conf.wanyol.com
+0.0.0.0 aip-gw-cn.allawntech.com
+0.0.0.0 personal-inference-cn.allawntech.com
+0.0.0.0 odin.allawntech.com
+0.0.0.0 odin-inference-cn.allawntech.com
+0.0.0.0 odin-deployment-cn.wanyol.com
+0.0.0.0 odin-distrib-cn.allawntech.com
+0.0.0.0 classify-app-cn.allawntech.com
+0.0.0.0 traffic-monitor-cn.allawntech.com
+0.0.0.0 traffic-operation-cn.allawntech.com
+0.0.0.0 conn-service-gl-01.allawntech.com
+
+# ============ E. 默认关闭（按需手动启用） ============
+# ocna-cloud-cn.heytapmobi.com      # com.oplus.nas 上报端点，但也是网络加速策略下发
+# ocna.wanyol.com                   # 同上
+# sport.health.heytapmobi.com       # 加了健康数据不同步
+# onepush-identity-cn.heytapmobi.com # 加了推送会废
+# htms.heytapmobi.com               # 疑似统计，未验证

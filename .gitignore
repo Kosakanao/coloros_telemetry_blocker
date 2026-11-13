@@ -1,0 +1,15 @@
+# KernelSU / Magisk 模块打包产物
+dist/
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini

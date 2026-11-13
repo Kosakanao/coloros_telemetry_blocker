@@ -1,0 +1,16 @@
+# 统一换行符：Android 侧脚本必须是 LF，PowerShell 用 CRLF
+* text=auto eol=lf
+
+*.sh      text eol=lf
+*.py      text eol=lf
+*.md      text eol=lf
+*.prop    text eol=lf
+*.html    text eol=lf
+*.yml     text eol=lf
+*.gitattributes text eol=lf
+LICENSE   text eol=lf
+
+*.ps1     text eol=crlf
+
+*.png     binary
+*.zip     binary
